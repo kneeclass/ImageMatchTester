@@ -1,9 +1,13 @@
 package com.kov.photomatchtester;
 
 import android.Manifest;
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Environment;
@@ -15,6 +19,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -40,6 +45,11 @@ public class MainActivity extends AppCompatActivity {
     };
 
     @Override
+    protected void onDestroy() {
+        super.onDestroy();
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
@@ -49,8 +59,8 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
 
+                //check permission
                 int permission = ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
-
                 if (permission != PackageManager.PERMISSION_GRANTED) {
                     // We don't have permission so prompt the user
                     ActivityCompat.requestPermissions(
@@ -60,9 +70,7 @@ public class MainActivity extends AppCompatActivity {
                     );
                 }
 
-
                 Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-                //outfile where we are thinking of saving it
                 String storage = System.getenv("EXTERNAL_STORAGE");
                 File file = new File(storage, "test.jpg");
                 CapturedImageURL = Uri.fromFile(file);
@@ -77,37 +85,66 @@ public class MainActivity extends AppCompatActivity {
             }
 
         });
+
+        Button uploadButton = (Button) findViewById(R.id.uploadButton);
+        uploadButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+
+                ((Button)findViewById(R.id.uploadButton)).setEnabled(false);
+                ((Button)findViewById(R.id.button)).setEnabled(false);
+
+                PhotoUploader photoUploader = new PhotoUploader(MainActivity.this);
+                File file = new File(CapturedImageURL.getPath());
+
+                photoUploader.execute(file);
+            }
+        });
+            
+    }
+
+    public void PhotoUploadResult(String str){
+        ((Button)findViewById(R.id.uploadButton)).setEnabled(true);
+        ((Button)findViewById(R.id.button)).setEnabled(true);
+        Toast.makeText(MainActivity.this, str, Toast.LENGTH_LONG).show();
+    }
+
+    private Bitmap GetImageForImageView(File file) throws IOException {
+        Bitmap myBitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
+
+        ExifInterface exif =  new ExifInterface(file.getAbsolutePath());
+        int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, 1);
+        Log.d("EXIF", "Exif: " + orientation);
+        Matrix matrix = new Matrix();
+        if (orientation == 6) {
+            matrix.postRotate(90);
+        }
+        else if (orientation == 3) {
+            matrix.postRotate(180);
+        }
+        else if (orientation == 8) {
+            matrix.postRotate(270);
+        }
+        return Bitmap.createBitmap(myBitmap, 0, 0, myBitmap.getWidth(), myBitmap.getHeight(), matrix, true);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
-
-            Uri uri = null;
-
-            if (data != null)  {
-                uri = data.getData();
-            }
-            if (uri == null && CapturedImageURL != null)  {
-                uri = Uri.fromFile(new File(CapturedImageURL.getPath()));
-            }
-            File file = new File(CapturedImageURL.getPath());
-
-            if(!file.exists()){
-                Toast.makeText(this, "File does not exist", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            PhotoUploader photoUploader = new PhotoUploader();
             try {
-                String str = photoUploader.execute(file).get();
-                Toast.makeText(this, str, Toast.LENGTH_LONG).show();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (ExecutionException e) {
+                File file = new File(CapturedImageURL.getPath());
+                if(!file.exists()){
+                    Toast.makeText(this, "File does not exist", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                ((ImageView)findViewById(R.id.imageView)).setImageBitmap(GetImageForImageView(file));
+                ((Button)findViewById(R.id.uploadButton)).setVisibility(View.VISIBLE);
+                ((Button)findViewById(R.id.button)).setText("Ta en ny bild");
+
+            } catch (IOException e) {
                 e.printStackTrace();
             }
-
 
         }
     }

@@ -1,6 +1,8 @@
 package com.kov.photomatchtester;
 
 import android.os.AsyncTask;
+import android.view.View;
+import android.widget.ProgressBar;
 
 import java.io.File;
 import java.io.IOException;
@@ -17,6 +19,13 @@ import okhttp3.Response;
  */
 
 public class PhotoUploader extends AsyncTask<File, Integer, String> {
+
+    private MainActivity _mainActivity;
+
+    public PhotoUploader(MainActivity mainActivity){
+
+        _mainActivity = mainActivity;
+    }
 
     @Override
     protected String doInBackground(File... params) {
@@ -38,5 +47,19 @@ public class PhotoUploader extends AsyncTask<File, Integer, String> {
             e.printStackTrace();
             return null;
         }
+    }
+
+    @Override
+    protected void onPreExecute() {
+        super.onPreExecute();
+        _mainActivity.findViewById(R.id.progressBar).setVisibility(View.VISIBLE);
+    }
+
+    @Override
+    protected void onPostExecute(String s) {
+        super.onPostExecute(s);
+        _mainActivity.findViewById(R.id.progressBar).setVisibility(View.INVISIBLE);
+        _mainActivity.PhotoUploadResult(s);
+
     }
 }
